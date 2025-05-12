@@ -2129,13 +2129,19 @@ namespace CSEuchre4
             Refresh(uie);
             await DelayAsync(_timerSleepDuration);
         }
-        
-        // Legacy method for compatibility
+          // Legacy method for compatibility - still introduces a delay but maintains synchronous behavior
         private static void RefreshAndSleep(UIElement uie)
         {
             Refresh(uie);
-            // Use a non-blocking approach - schedule the refresh and continue
-            uie.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(delegate { }));
+            // Create and configure a timer to actually pause execution
+            using (ManualResetEvent waitEvent = new ManualResetEvent(false))
+            {
+                // Use a timer to signal after the delay period
+                Timer timer = new Timer(_ => waitEvent.Set(), null, _timerSleepDuration, Timeout.Infinite);
+                // Block until the timer signals
+                waitEvent.WaitOne();
+                timer.Dispose();
+            }
         }
         
         private static void Refresh(UIElement uie)
