@@ -44,7 +44,8 @@ namespace CSEuchre4
 
             Score.Append(value.ToString());
             return Score.ToString();
-        }        static public void SetImage(System.Windows.Controls.Image Img, System.Drawing.Image res)
+        }        
+        static public void SetImage(System.Windows.Controls.Image Img, System.Drawing.Image res)
         {
             // Convert System.Drawing.Image to BitmapImage with proper resource cleanup
             using (MemoryStream memStream = new MemoryStream())
@@ -64,7 +65,8 @@ namespace CSEuchre4
                 // Set the image source
                 Img.Source = bmpImage;
             }
-        }        static public void SetIcon(System.Windows.Window win, System.Drawing.Icon res)
+        }        
+        static public void SetIcon(System.Windows.Window win, System.Drawing.Icon res)
         {
             // Convert System.Drawing.Icon to BitmapImage with proper resource cleanup
             using (MemoryStream memStream = new MemoryStream())
@@ -718,18 +720,20 @@ namespace CSEuchre4
             DoubleAnimation animationX = new DoubleAnimation();
             DoubleAnimation animationY = new DoubleAnimation();
             animationX.Duration = duration;
-            animationY.Duration = duration;
-
-            Storyboard storyboard = new Storyboard();
+            animationY.Duration = duration;            Storyboard storyboard = new Storyboard();
             storyboard.Duration = duration;
             storyboard.Children.Add(animationX);
             storyboard.Children.Add(animationY);
             Storyboard.SetTarget(animationX, moveTransform);
-            Storyboard.SetTarget(animationY, moveTransform);            Storyboard.SetTargetProperty(animationX, new PropertyPath("X"));
+            Storyboard.SetTarget(animationY, moveTransform);            
+            Storyboard.SetTargetProperty(animationX, new PropertyPath("X"));
             Storyboard.SetTargetProperty(animationY, new PropertyPath("Y"));
             animationX.To = moveTransform.X;
             animationY.To = moveTransform.Y;
-            EuchreGrid.Resources.Add("storyboard", storyboard);
+            
+            // Generate a unique resource key for each storyboard
+            string storyboardKey = "storyboard_" + Guid.NewGuid().ToString();
+            EuchreGrid.Resources.Add(storyboardKey, storyboard);
 
             // Use Completed event instead of Thread.Sleep
             storyboard.Completed += (s, e) => 
@@ -742,7 +746,10 @@ namespace CSEuchre4
                 animatedCardFrame.Margin = new Thickness(0, 0, 0, 0);
                 
                 // Clean up
-                EuchreGrid.Resources.Remove("storyboard");
+                if (EuchreGrid.Resources.Contains(storyboardKey))
+                {
+                    EuchreGrid.Resources.Remove(storyboardKey);
+                }
             };
 
             storyboard.Begin();
