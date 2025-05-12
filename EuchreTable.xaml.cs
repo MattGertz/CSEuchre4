@@ -873,68 +873,54 @@ namespace CSEuchre4
             {
                 gamePlayers[(int)seat].gameVoice.SayTheyGotTwo();
             }
-        }
-
-        private void SpeakTheyGotFour(EuchrePlayer.Seats seat)
+        }        private void SpeakTheyGotFour(EuchrePlayer.Seats seat)
         {
             if (seat != EuchrePlayer.Seats.Partner && _modeSoundOn)
             {
                 gamePlayers[(int)seat].gameVoice.SayTheyGotFour();
             }
-        }        private void PlayResourceSound(System.IO.UnmanagedMemoryStream res)
+        }
+        
+        private void PlayResourceSound(System.IO.UnmanagedMemoryStream res)
         {
-            // Convert UnmanagedMemoryStream to a temporary file - fully qualified Path to avoid ambiguity
-            string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"CSEuchre_{Guid.NewGuid()}.wav");
-            
-            try
-            {
-                // Create a MediaPlayer instance to play the sound without blocking the UI thread
-                var player = new System.Windows.Media.MediaPlayer();
-                
-                using (var fileStream = new System.IO.FileStream(tempFile, System.IO.FileMode.Create))
-                {
-                    byte[] buffer = new byte[res.Length];
-                    res.Read(buffer, 0, buffer.Length);
-                    fileStream.Write(buffer, 0, buffer.Length);
-                }
-                
-                player.Open(new Uri(tempFile));
-                player.MediaEnded += (s, e) => 
-                {
-                    player.Close();
-                    // Clean up the temporary file
-                    try { System.IO.File.Delete(tempFile); } catch { }
-                };
-                player.Play();
-            }
-            catch (Exception)
-            {
-                // Fallback to SoundPlayer if MediaPlayer fails
-                using (var player = new System.Media.SoundPlayer(res))
-                {
-                    player.Play(); // Use Play instead of PlaySync to avoid blocking UI thread
-                }
-                
-                // Clean up the temporary file
-                try { System.IO.File.Delete(tempFile); } catch { }
-            }
+            // Use the separate EuchreSoundPlayer class to play sounds synchronously
+            EuchreSoundPlayer.PlaySoundSync(res);
         }
 
         private void PlayCardSound()
         {
             if (_modeSoundOn)
-                PlayResourceSound(Properties.Resources.SoundPlayCard);
+                EuchreSoundPlayer.PlayCardSoundWithPacing(Properties.Resources.SoundPlayCard);
         }
-
+        
+        private void PlayCardSoundWithAnimation(UIElement element)
+        {
+            if (_modeSoundOn)
+                EuchreSoundPlayer.PlayCardSoundWithAnimation(Properties.Resources.SoundPlayCard, element);
+        }
+        
+        private void PlayCardSoundWithTrickSequencing(UIElement element, int positionInTrick)
+        {
+            if (_modeSoundOn)
+            {
+                // Use the specialized method that handles trick sequencing
+                EuchreSoundPlayer.PlayCardSoundForTrick(
+                    Properties.Resources.SoundPlayCard, 
+                    element, 
+                    true,  // This is part of a sequence
+                    positionInTrick); // Position in sequence (0-3)
+            }
+        }
+        
         private void PlayApplause(int level)
         {
             if (_modeSoundOn)
             {
                 switch (level)
                 {
-                case 1: PlayResourceSound(Properties.Resources.SoundApplauseSoft); break;
-                case 2: PlayResourceSound(Properties.Resources.SoundApplauseLoud); break;
-                case 3: PlayResourceSound(Properties.Resources.SoundApplauseWild); break;
+                case 1: EuchreSoundPlayer.PlaySoundSync(Properties.Resources.SoundApplauseSoft); break;
+                case 2: EuchreSoundPlayer.PlaySoundSync(Properties.Resources.SoundApplauseLoud); break;
+                case 3: EuchreSoundPlayer.PlaySoundSync(Properties.Resources.SoundApplauseWild); break;
                 }
             }
         }
@@ -946,10 +932,8 @@ namespace CSEuchre4
             if (_modeSoundOn)
             {
                 int numShuffle = EuchreTable.GenRandomNumber(2) + 1;
-                for (int i = 0; i <= numShuffle; i++)
-                {
-                    PlayResourceSound(Properties.Resources.SoundShuffleDeck);
-                }
+                // Use the specialized method for shuffle sounds to ensure proper timing
+                EuchreSoundPlayer.PlayShuffleSequence(Properties.Resources.SoundShuffleDeck, numShuffle + 1);
             }
             UpdateStatus(Properties.Resources.Notice_DealingCards);
         }
@@ -1269,24 +1253,30 @@ namespace CSEuchre4
                     handKitty[3].GetImage(EuchrePlayer.Seats.NoPlayer)
                     );
             }
-        }
-
-        private void DealACard(EuchrePlayer.Seats player, int slot)
+        }        private void DealACard(EuchrePlayer.Seats player, int slot)
         {
+            // Get the next card from the deck
             gamePlayers[(int)player].handCardsHeld[slot] = _gameDeck.GetNextCard();
+            
+            // Set card state based on player
             if (player != EuchrePlayer.Seats.Player)
             {
                 gamePlayers[(int)player].handCardsHeld[slot].stateCurrent = EuchreCard.States.FaceDown;
+                SetImage(gameTableTopCards[(int)player, slot], EuchreCard.imagesCardBack[(int)player]);
             }
             else
             {
                 gamePlayers[(int)player].handCardsHeld[slot].stateCurrent = EuchreCard.States.FaceUp;
+                SetImage(gameTableTopCards[(int)player, slot], gamePlayers[(int)player].handCardsHeld[slot].imageCurrent);
             }
-            // TODO: AnimateACard call goes here.
-
-            SetImage(gameTableTopCards[(int)player, slot], EuchreCard.imagesCardBack[(int)player]);
+            
+            // Make card visible and set tooltip
             SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
             SetTooltip(gameTableTopCards[(int)player, slot], Properties.Resources.CARDNAME_BACK);
+            
+            // Update the layout to ensure UI is ready
+            gameTableTopCards[(int)player, slot].UpdateLayout();
+              // Play sound and allow time for UI to refresh
             PlayCardSound();
             RefreshAndSleep(gameTableTopCards[(int)player, slot]);
         }
@@ -1394,15 +1384,16 @@ namespace CSEuchre4
             MarkCardAsPlayed(player.handCardsHeld[index]);
             player.handCardsHeld[index] = null;
             SetTooltip(gameTableTopCards[(int)player.Seat, index], null);
-            gameTableTopCards[(int)player.Seat, index].Source = null;
-
-            SetUIElementVisibility(gameTableTopCards[(int)player.Seat, index], Visibility.Hidden);
+            gameTableTopCards[(int)player.Seat, index].Source = null;            
+            SetUIElementVisibility(gameTableTopCards[(int)player.Seat, index], Visibility.Hidden);            
             SetUIElementVisibility(gameTableTopCards[(int)player.Seat, 5], Visibility.Visible);
-
+              // First ensure the animation is visible by updating the layout
             UpdateLayout();
-
+            
+            // Use the simpler card sound method with pacing
             PlayCardSound();
-            Refresh(gameTableTopCards[(int)player.Seat, index]);
+            
+            // Make sure the UI is properly refreshed after the sound/sleep
             RefreshAndSleep(gameTableTopCards[(int)player.Seat, 5]);
         }
 
@@ -1501,9 +1492,7 @@ namespace CSEuchre4
             statePlayerIsPlayingACard = true;
             SetPlayerCursorToHand(true);
 
-        }
-
-        private void PlayCardForTrick()
+        }        private void PlayCardForTrick()
         {
             if (!trickPlayer.handSittingOut)
             {
@@ -1522,6 +1511,25 @@ namespace CSEuchre4
                 {
                     trickSuitLed = trickPlayer.handCardsHeld[trickSelectedCardIndex].GetCurrentSuit(handTrumpSuit);
                 }
+                
+                // Calculate position in trick for proper sound sequencing (0-3)
+                int currentPosition = 0;
+                for (EuchrePlayer.Seats seat = EuchrePlayer.Seats.LeftOpponent; seat <= EuchrePlayer.Seats.Player; seat++)
+                {
+                    if (handPlayedCards[(int)seat] != null)
+                    {
+                        currentPosition++;
+                    }
+                }
+                
+                // Add a small delay before playing the next card to prevent sound overlap
+                // Delay increases for cards played later in the trick
+                if (trickPlayer.Seat != EuchrePlayer.Seats.Player && currentPosition > 0)
+                {
+                    // Delay scales with position in trick
+                    Thread.Sleep(200 + (currentPosition * 50));
+                }
+                
                 PlaySelectedCard(trickPlayer, trickSelectedCardIndex);
 
                 EuchreCard.Values thisValue = handPlayedCards[(int)trickPlayer.Seat].GetCurrentValue(handTrumpSuit, handPlayedCards[(int)trickLeaderIndex].GetCurrentSuit(handTrumpSuit));
@@ -1783,12 +1791,10 @@ namespace CSEuchre4
 
             SetImage(gameTableTopCards[(int)player, slot], card.imageCurrent);
             SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
-            SetTooltip(gameTableTopCards[(int)player, slot], Properties.Resources.ResourceManager.GetString(card.GetDisplayStringResourceName()));
-
-            StringBuilder sDealt = new StringBuilder();
+            SetTooltip(gameTableTopCards[(int)player, slot], Properties.Resources.ResourceManager.GetString(card.GetDisplayStringResourceName()));            StringBuilder sDealt = new StringBuilder();
             sDealt.AppendFormat(Properties.Resources.Notice_DealtACard, gamePlayers[(int)player].GetDisplayName(), Properties.Resources.ResourceManager.GetString(card.GetDisplayStringResourceName()));
             UpdateStatus(sDealt.ToString());
-
+            // Use simple method for card sounds
             PlayCardSound();
 
             RefreshAndSleep(gameTableTopCards[(int)player, slot]);
@@ -2307,7 +2313,7 @@ namespace CSEuchre4
 
         public EuchrePlayer.Seats trickLeaderIndex;
         public EuchreCard.Suits trickSuitLed;
-        public int trickSelectedCardIndex = 0;
+        public int trickSelectedCardIndex = 0;        
         public EuchrePlayer trickLeader;
         public EuchrePlayer trickPlayer;
         public EuchreCard.Values trickHighestCardSoFar;
