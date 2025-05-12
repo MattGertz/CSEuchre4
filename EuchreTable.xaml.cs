@@ -1253,21 +1253,26 @@ namespace CSEuchre4
                     handKitty[3].GetImage(EuchrePlayer.Seats.NoPlayer)
                     );
             }
-        }        private void DealACard(EuchrePlayer.Seats player, int slot)
+        }          private void DealACard(EuchrePlayer.Seats player, int slot)
         {
             // Get the next card from the deck
-            gamePlayers[(int)player].handCardsHeld[slot] = _gameDeck.GetNextCard();
+            EuchreCard card = _gameDeck.GetNextCard();
+            gamePlayers[(int)player].handCardsHeld[slot] = card;
+            
+            // Set the card's perspective first (before manipulation)
+            card.Perspective = player;
             
             // Set card state based on player
             if (player != EuchrePlayer.Seats.Player)
             {
-                gamePlayers[(int)player].handCardsHeld[slot].stateCurrent = EuchreCard.States.FaceDown;
+                card.stateCurrent = EuchreCard.States.FaceDown;
                 SetImage(gameTableTopCards[(int)player, slot], EuchreCard.imagesCardBack[(int)player]);
             }
             else
             {
-                gamePlayers[(int)player].handCardsHeld[slot].stateCurrent = EuchreCard.States.FaceUp;
-                SetImage(gameTableTopCards[(int)player, slot], gamePlayers[(int)player].handCardsHeld[slot].imageCurrent);
+                card.stateCurrent = EuchreCard.States.FaceUp;
+                // Ensure the image orientation matches the perspective before display
+                SetImage(gameTableTopCards[(int)player, slot], card.imageCurrent);
             }
             
             // Make card visible and set tooltip
@@ -1276,7 +1281,9 @@ namespace CSEuchre4
             
             // Update the layout to ensure UI is ready
             gameTableTopCards[(int)player, slot].UpdateLayout();
-              // Play sound and allow time for UI to refresh
+            
+            // Play sound and allow time for UI to refresh 
+            // Keeping this synchronous to ensure proper display order
             PlayCardSound();
             RefreshAndSleep(gameTableTopCards[(int)player, slot]);
         }
@@ -1779,25 +1786,37 @@ namespace CSEuchre4
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Hidden;
             handDealer = EuchrePlayer.NextPlayer(handDealer);
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Visible;
-        }
-
-        private EuchreCard DealACardForDeal(EuchrePlayer.Seats player, int slot)
+        }        private EuchreCard DealACardForDeal(EuchrePlayer.Seats player, int slot)
         {
             EuchreCard card = _gameDeck.GetNextCard();
-            card.Perspective = player;
-
-            // TODO:  Animate a card goes here
-            AnimateACard(EuchreCard.imagesCardBack[(int)player], ContinueButton, gameTableTopCards[(int)player, slot],card.Perspective);
-
-            SetImage(gameTableTopCards[(int)player, slot], card.imageCurrent);
+            
+            // First ensure the card's orientation is properly set
+            System.Drawing.Image cardImage = player != EuchrePlayer.Seats.Player ? 
+                EuchreCard.imagesCardBack[(int)player] : 
+                card.imageCurrent;
+                
+            // Animate the card from the continue button to its position
+            AnimateACard(EuchreCard.imagesCardBack[(int)player], ContinueButton, gameTableTopCards[(int)player, slot], player);
+            
+            // Make the card visible at its destination
             SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
-            SetTooltip(gameTableTopCards[(int)player, slot], Properties.Resources.ResourceManager.GetString(card.GetDisplayStringResourceName()));            StringBuilder sDealt = new StringBuilder();
+            
+            // Now update the perspective after the animation
+            card.Perspective = player;
+            
+            // Set the card image and make it visible
+            SetImage(gameTableTopCards[(int)player, slot], cardImage);
+            SetTooltip(gameTableTopCards[(int)player, slot], Properties.Resources.ResourceManager.GetString(card.GetDisplayStringResourceName()));
+            
+            // Update display and play sound
+            StringBuilder sDealt = new StringBuilder();
             sDealt.AppendFormat(Properties.Resources.Notice_DealtACard, gamePlayers[(int)player].GetDisplayName(), Properties.Resources.ResourceManager.GetString(card.GetDisplayStringResourceName()));
             UpdateStatus(sDealt.ToString());
-            // Use simple method for card sounds
+            
+            // Play sound and ensure UI updates completely
             PlayCardSound();
-
             RefreshAndSleep(gameTableTopCards[(int)player, slot]);
+            
             return card;
         }
 

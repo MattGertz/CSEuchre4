@@ -119,8 +119,7 @@ namespace CSEuchre4
             orientationCurrent = EuchrePlayer.Seats.Player;
             _gameTable = CardTable;
 
-        }
-        public EuchrePlayer.Seats Perspective
+        }        public EuchrePlayer.Seats Perspective
         {
             get { return orientationCurrent; }
             set
@@ -128,23 +127,27 @@ namespace CSEuchre4
                 int diff = orientationCurrent - value;
                 if (diff != 0)
                 {
-                    RotateFlipType rft = RotateFlipType.RotateNoneFlipNone;
-                    switch (diff)
+                    // Only rotate if imageCurrent is not null
+                    if (imageCurrent != null)
                     {
-                    case -1:
-                    case 3:
-                        rft = RotateFlipType.Rotate90FlipNone;
-                        break;
-                    case -2:
-                    case 2:
-                        rft = RotateFlipType.Rotate180FlipNone;
-                        break;
-                    case -3:
-                    case 1:
-                        rft = RotateFlipType.Rotate270FlipNone;
-                        break;
+                        RotateFlipType rft = RotateFlipType.RotateNoneFlipNone;
+                        switch (diff)
+                        {
+                        case -1:
+                        case 3:
+                            rft = RotateFlipType.Rotate90FlipNone;
+                            break;
+                        case -2:
+                        case 2:
+                            rft = RotateFlipType.Rotate180FlipNone;
+                            break;
+                        case -3:
+                        case 1:
+                            rft = RotateFlipType.Rotate270FlipNone;
+                            break;
+                        }
+                        imageCurrent.RotateFlip(rft);
                     }
-                    imageCurrent.RotateFlip(rft);
                     orientationCurrent = value;
                 }
             }
