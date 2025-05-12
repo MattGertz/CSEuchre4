@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>CSEuchre4</RootNamespace>
+    <AssemblyName>CSEuchre4</AssemblyName>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <ApplicationIcon>Images\Euchre.ico</ApplicationIcon>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+    <!-- WPF-specific options -->
+    <IncludePackageReferencesDuringMarkupCompilation>true</IncludePackageReferencesDuringMarkupCompilation>
+    <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="sounds\**\*.wav" />
+    <None Remove="text\**\*.rtf" />
+    <None Remove="Images\**\*.bmp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="sounds\*.wav">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\Euchre.ico" />
+    <Resource Include="Images\*.bmp" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="System.Speech" Version="8.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- Suppress warnings about Windows-only APIs since this is a Windows-only app -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="text\CSEuchreRules.rtf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

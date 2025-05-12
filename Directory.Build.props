@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <Company>Where's That Cat? software</Company>
+    <Product>CSEuchre4</Product>
+    <Copyright>Copyright © Matthew Gertz. All rights reserved.</Copyright>
+    <Description>A Euchre game written in C# by Matthew Gertz</Description>
+    <Title>C# Euchre</Title>
+    <Version>4.1.0.0</Version>
+    <FileVersion>4.1.0.0</FileVersion>
+    <NeutralLanguage>en-US</NeutralLanguage>
+  </PropertyGroup>
+</Project>
