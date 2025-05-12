@@ -40,7 +40,12 @@ namespace CSEuchre4
             if (e.Uri != null && !string.IsNullOrEmpty(e.Uri.OriginalString))
             {
                 string uri = e.Uri.AbsoluteUri;
-                Process.Start(new ProcessStartInfo(uri));
+                var psi = new ProcessStartInfo
+                {
+                    FileName = uri,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
                 e.Handled = true;
             }
         }

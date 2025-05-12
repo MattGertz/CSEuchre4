@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -43,30 +44,46 @@ namespace CSEuchre4
 
             Score.Append(value.ToString());
             return Score.ToString();
-        }
-
-        static public void SetImage(System.Windows.Controls.Image Img, System.Drawing.Image res)
+        }        static public void SetImage(System.Windows.Controls.Image Img, System.Drawing.Image res)
         {
-            BitmapImage bmpImage = new BitmapImage();
-            bmpImage.BeginInit();
-            MemoryStream memStream = new MemoryStream();
-            res.Save(memStream, System.Drawing.Imaging.ImageFormat.Bmp);
-            memStream.Seek(0, SeekOrigin.Begin);
-            bmpImage.StreamSource = memStream;
-            bmpImage.EndInit();
-            Img.Source = bmpImage;
-        }
-
-        static public void SetIcon(System.Windows.Window win, System.Drawing.Icon res)
+            // Convert System.Drawing.Image to BitmapImage with proper resource cleanup
+            using (MemoryStream memStream = new MemoryStream())
+            {
+                // Save System.Drawing.Image to memory stream
+                res.Save(memStream, System.Drawing.Imaging.ImageFormat.Png);
+                memStream.Position = 0;
+                
+                // Create BitmapImage in a way that allows the memStream to be properly disposed
+                BitmapImage bmpImage = new BitmapImage();
+                bmpImage.BeginInit();
+                bmpImage.CacheOption = BitmapCacheOption.OnLoad; // Crucial for stream disposal
+                bmpImage.StreamSource = memStream;
+                bmpImage.EndInit();
+                bmpImage.Freeze(); // Freeze for cross-thread access
+                
+                // Set the image source
+                Img.Source = bmpImage;
+            }
+        }        static public void SetIcon(System.Windows.Window win, System.Drawing.Icon res)
         {
-            BitmapImage bmpImage = new BitmapImage();
-            bmpImage.BeginInit();
-            MemoryStream memStream = new MemoryStream();
-            res.Save(memStream);
-            memStream.Seek(0, SeekOrigin.Begin);
-            bmpImage.StreamSource = memStream;
-            bmpImage.EndInit();
-            win.Icon = bmpImage;
+            // Convert System.Drawing.Icon to BitmapImage with proper resource cleanup
+            using (MemoryStream memStream = new MemoryStream())
+            {
+                // Save icon to memory stream
+                res.Save(memStream);
+                memStream.Position = 0;
+                
+                // Create BitmapImage in a way that allows the memStream to be properly disposed
+                BitmapImage bmpImage = new BitmapImage();
+                bmpImage.BeginInit();
+                bmpImage.CacheOption = BitmapCacheOption.OnLoad; // Crucial for stream disposal
+                bmpImage.StreamSource = memStream;
+                bmpImage.EndInit();
+                bmpImage.Freeze(); // Freeze for cross-thread access
+                
+                // Set the window icon
+                win.Icon = bmpImage;
+            }
         }
         #endregion
 
@@ -708,25 +725,27 @@ namespace CSEuchre4
             storyboard.Children.Add(animationX);
             storyboard.Children.Add(animationY);
             Storyboard.SetTarget(animationX, moveTransform);
-            Storyboard.SetTarget(animationY, moveTransform);
-
-            Storyboard.SetTargetProperty(animationX, new PropertyPath("X"));
+            Storyboard.SetTarget(animationY, moveTransform);            Storyboard.SetTargetProperty(animationX, new PropertyPath("X"));
             Storyboard.SetTargetProperty(animationY, new PropertyPath("Y"));
             animationX.To = moveTransform.X;
             animationY.To = moveTransform.Y;
             EuchreGrid.Resources.Add("storyboard", storyboard);
 
+            // Use Completed event instead of Thread.Sleep
+            storyboard.Completed += (s, e) => 
+            {
+                // Fourth, free the image of the animated card
+                animatedCard.Visibility = Visibility.Hidden;
+                animatedCard.Source = null;
+
+                // Fifth, invisibly move the animated card back to 0,0 margin
+                animatedCardFrame.Margin = new Thickness(0, 0, 0, 0);
+                
+                // Clean up
+                EuchreGrid.Resources.Remove("storyboard");
+            };
+
             storyboard.Begin();
-            Thread.Sleep(700); // TODO:  remove hack
-            EuchreGrid.Resources.Remove("storyboard");
-
-
-            // Fourth, free the image of the animated card
-            animatedCard.Visibility = Visibility.Hidden;
-            animatedCard.Source = null;
-
-            // Fifth, invisibly move the animated card back to 0,0 margin
-            animatedCardFrame.Margin = new Thickness(0, 0, 0, 0);
         }
 
         private void SpeakWeGotEuchredMyFault(EuchrePlayer.Seats seat)
@@ -855,13 +874,42 @@ namespace CSEuchre4
             {
                 gamePlayers[(int)seat].gameVoice.SayTheyGotFour();
             }
-        }
-
-        private void PlayResourceSound(System.IO.UnmanagedMemoryStream res)
+        }        private void PlayResourceSound(System.IO.UnmanagedMemoryStream res)
         {
-            using (var player = new System.Media.SoundPlayer(res))
+            // Convert UnmanagedMemoryStream to a temporary file - fully qualified Path to avoid ambiguity
+            string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"CSEuchre_{Guid.NewGuid()}.wav");
+            
+            try
             {
-                player.PlaySync();
+                // Create a MediaPlayer instance to play the sound without blocking the UI thread
+                var player = new System.Windows.Media.MediaPlayer();
+                
+                using (var fileStream = new System.IO.FileStream(tempFile, System.IO.FileMode.Create))
+                {
+                    byte[] buffer = new byte[res.Length];
+                    res.Read(buffer, 0, buffer.Length);
+                    fileStream.Write(buffer, 0, buffer.Length);
+                }
+                
+                player.Open(new Uri(tempFile));
+                player.MediaEnded += (s, e) => 
+                {
+                    player.Close();
+                    // Clean up the temporary file
+                    try { System.IO.File.Delete(tempFile); } catch { }
+                };
+                player.Play();
+            }
+            catch (Exception)
+            {
+                // Fallback to SoundPlayer if MediaPlayer fails
+                using (var player = new System.Media.SoundPlayer(res))
+                {
+                    player.Play(); // Use Play instead of PlaySync to avoid blocking UI thread
+                }
+                
+                // Clean up the temporary file
+                try { System.IO.File.Delete(tempFile); } catch { }
             }
         }
 
@@ -2062,14 +2110,27 @@ namespace CSEuchre4
             ContinueButton.IsEnabled = false;
             ContinueButton.IsHitTestVisible = false;
             UpdateEuchreState(_stateDesiredStateAfterHumanClick);
+        }        private static Action EmptyDelegate = delegate () { };
+        
+        private static async Task DelayAsync(int milliseconds)
+        {
+            await Task.Delay(milliseconds);
         }
-
-        private static Action EmptyDelegate = delegate () { };
+        
+        private static async void RefreshAndSleepAsync(UIElement uie)
+        {
+            Refresh(uie);
+            await DelayAsync(_timerSleepDuration);
+        }
+        
+        // Legacy method for compatibility
         private static void RefreshAndSleep(UIElement uie)
         {
             Refresh(uie);
-            Thread.Sleep(_timerSleepDuration);
+            // Use a non-blocking approach - schedule the refresh and continue
+            uie.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(delegate { }));
         }
+        
         private static void Refresh(UIElement uie)
         {
             uie.Dispatcher.Invoke(DispatcherPriority.Render, EmptyDelegate);
