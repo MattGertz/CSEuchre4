@@ -704,11 +704,14 @@ namespace CSEuchre4
             FrameworkElement endingControlFrame = (FrameworkElement)endingControl;
 
             // First, invisibly move the animated card to the starting control's margins
-            animatedCardFrame.Margin = new Thickness(startingControlFrame.Margin.Left, startingControlFrame.Margin.Top, startingControlFrame.Margin.Right, startingControlFrame.Margin.Bottom);
-
-            // Second, set the image of the animated card
+            animatedCardFrame.Margin = new Thickness(startingControlFrame.Margin.Left, startingControlFrame.Margin.Top, startingControlFrame.Margin.Right, startingControlFrame.Margin.Bottom);            // Second, set the image of the animated card
             SetImage(animatedCard, imageToAnimate);
             animatedCard.Visibility = Visibility.Visible;
+            // Ensure the other animated card is hidden
+            if (animatedCard == AnimatedCardHorizontal)
+                AnimatedCardVertical.Visibility = Visibility.Hidden;
+            else
+                AnimatedCardHorizontal.Visibility = Visibility.Hidden;
             UpdateLayout();
 
             // Third, visibly move the animated card to the ending control's margins
@@ -720,7 +723,8 @@ namespace CSEuchre4
             DoubleAnimation animationX = new DoubleAnimation();
             DoubleAnimation animationY = new DoubleAnimation();
             animationX.Duration = duration;
-            animationY.Duration = duration;            Storyboard storyboard = new Storyboard();
+            animationY.Duration = duration;            
+            Storyboard storyboard = new Storyboard();
             storyboard.Duration = duration;
             storyboard.Children.Add(animationX);
             storyboard.Children.Add(animationY);
@@ -1786,7 +1790,8 @@ namespace CSEuchre4
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Hidden;
             handDealer = EuchrePlayer.NextPlayer(handDealer);
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Visible;
-        }        private EuchreCard DealACardForDeal(EuchrePlayer.Seats player, int slot)
+        }        
+        private EuchreCard DealACardForDeal(EuchrePlayer.Seats player, int slot)
         {
             EuchreCard card = _gameDeck.GetNextCard();
             
@@ -1794,9 +1799,9 @@ namespace CSEuchre4
             System.Drawing.Image cardImage = player != EuchrePlayer.Seats.Player ? 
                 EuchreCard.imagesCardBack[(int)player] : 
                 card.imageCurrent;
-                
-            // Animate the card from the continue button to its position
-            AnimateACard(EuchreCard.imagesCardBack[(int)player], ContinueButton, gameTableTopCards[(int)player, slot], player);
+                  // Animate the card from the continue button to its position
+            // AnimateACard call commented out to prevent animation controls from becoming visible
+            // AnimateACard(EuchreCard.imagesCardBack[(int)player], ContinueButton, gameTableTopCards[(int)player, slot], player);
             
             // Make the card visible at its destination
             SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
@@ -2036,6 +2041,22 @@ namespace CSEuchre4
             SetTooltip(TrumpLeft, null);
             SetTooltip(TrumpRight, null);
         }
+
+        #region "Private methods to handle animation cards"
+
+        /// <summary>
+        /// Ensures that both animation card controls are hidden
+        /// </summary>
+        private void HideAnimationCards()
+        {
+            AnimatedCardHorizontal.Visibility = Visibility.Hidden;
+            AnimatedCardVertical.Visibility = Visibility.Hidden;
+            AnimatedCardHorizontal.Source = null;
+            AnimatedCardVertical.Source = null;
+        }
+
+        #endregion
+
         #endregion
 
         #region "Event handlers"
