@@ -1783,9 +1783,7 @@ namespace CSEuchre4
 
         private void NoOp()
         {
-        }
-
-        private void SetNextDealer()
+        }        private void SetNextDealer()
         {
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Hidden;
             handDealer = EuchrePlayer.NextPlayer(handDealer);
@@ -1795,10 +1793,8 @@ namespace CSEuchre4
         {
             EuchreCard card = _gameDeck.GetNextCard();
             
-            // First ensure the card's orientation is properly set
-            System.Drawing.Image cardImage = player != EuchrePlayer.Seats.Player ? 
-                EuchreCard.imagesCardBack[(int)player] : 
-                card.imageCurrent;
+            // All cards should be face up during dealer selection
+            System.Drawing.Image cardImage = card.imageCurrent;
                   // Animate the card from the continue button to its position
             // AnimateACard call commented out to prevent animation controls from becoming visible
             // AnimateACard(EuchreCard.imagesCardBack[(int)player], ContinueButton, gameTableTopCards[(int)player, slot], player);
