@@ -117,9 +117,9 @@ namespace CSEuchre4
             Suit = NewSuit;
             stateCurrent = States.FaceDown;
             orientationCurrent = EuchrePlayer.Seats.Player;
-            _gameTable = CardTable;
-
-        }        public EuchrePlayer.Seats Perspective
+            _gameTable = CardTable;        }
+        
+        public EuchrePlayer.Seats Perspective
         {
             get { return orientationCurrent; }
             set
@@ -149,9 +149,10 @@ namespace CSEuchre4
                         imageCurrent.RotateFlip(rft);
                     }
                     orientationCurrent = value;
-                }
-            }
-        }        public System.Drawing.Image GetImage(EuchrePlayer.Seats player)
+                }            }
+        }
+        
+        public System.Drawing.Image GetImage(EuchrePlayer.Seats player)
         {
             if (stateCurrent == States.FaceUp || _gameTable.modePeekAtOtherCards)
                 return imageCurrent;
@@ -262,7 +263,8 @@ namespace CSEuchre4
 
         #region "Public variables"
         public const int goalLoner = 117;
-        public const int goalMakeable = 85;        public States stateCurrent;
+        public const int goalMakeable = 85;
+        public States stateCurrent;
         public Suits Suit;
         public Ranks Rank;
         public System.Drawing.Image imageCurrent;
@@ -289,13 +291,16 @@ namespace CSEuchre4
         public void Initialize()
         {
             if (!_stateInited)
-            {                EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Player] = Properties.Resources.CARDBACK;
+            {
+                EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Player] = Properties.Resources.CARDBACK;
                 EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.LeftOpponent] = (System.Drawing.Image)EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Player].Clone();
                 EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.LeftOpponent].RotateFlip(RotateFlipType.Rotate90FlipNone);
                 EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.RightOpponent] = (System.Drawing.Image)EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Player].Clone();
                 EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.RightOpponent].RotateFlip(RotateFlipType.Rotate270FlipNone);
                 EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Partner] = (System.Drawing.Image)EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Player].Clone();
-                EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Partner].RotateFlip(RotateFlipType.Rotate180FlipNone);                int n = 0;
+                EuchreCard.imagesCardBack[(int)EuchrePlayer.Seats.Partner].RotateFlip(RotateFlipType.Rotate180FlipNone);
+                
+                int n = 0;
                 for (EuchreCard.Suits NewSuit = EuchreCard.Suits.Spades; NewSuit <= EuchreCard.Suits.Hearts; NewSuit++)
                 {
                     EuchreCard.imagesSuit[(int)NewSuit] = (System.Drawing.Image)Properties.Resources.ResourceManager.GetObject(EuchreCard.GetSuitImageResourceName(NewSuit));
@@ -312,12 +317,8 @@ namespace CSEuchre4
             }
             _stateInited = true;
             _cardTopmost = 0;
-        }
-
-        public EuchreCard GetNextCard()
-        {
-            
-            if (!_stateInited)
+        }        public EuchreCard GetNextCard()
+        {if (!_stateInited)
                 Shuffle();
             EuchreCard rv = _gameCards[_cardTopmost];
             _cardTopmost++;

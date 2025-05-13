@@ -875,9 +875,10 @@ namespace CSEuchre4
         {
             if (seat != EuchrePlayer.Seats.Partner && _modeSoundOn)
             {
-                gamePlayers[(int)seat].gameVoice.SayTheyGotTwo();
-            }
-        }        private void SpeakTheyGotFour(EuchrePlayer.Seats seat)
+                gamePlayers[(int)seat].gameVoice.SayTheyGotTwo();            }
+        }
+        
+        private void SpeakTheyGotFour(EuchrePlayer.Seats seat)
         {
             if (seat != EuchrePlayer.Seats.Partner && _modeSoundOn)
             {
@@ -1503,7 +1504,9 @@ namespace CSEuchre4
             statePlayerIsPlayingACard = true;
             SetPlayerCursorToHand(true);
 
-        }        private void PlayCardForTrick()
+        }
+        
+        private void PlayCardForTrick()
         {
             if (!trickPlayer.handSittingOut)
             {
@@ -1783,12 +1786,14 @@ namespace CSEuchre4
 
         private void NoOp()
         {
-        }        private void SetNextDealer()
+        }
+        
+        private void SetNextDealer()
         {
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Hidden;
             handDealer = EuchrePlayer.NextPlayer(handDealer);
-            _gameDealerBox[(int)handDealer].Visibility = Visibility.Visible;
-        }        
+            _gameDealerBox[(int)handDealer].Visibility = Visibility.Visible;        }
+        
         private EuchreCard DealACardForDeal(EuchrePlayer.Seats player, int slot)
         {
             EuchreCard card = _gameDeck.GetNextCard();
@@ -2159,7 +2164,9 @@ namespace CSEuchre4
             ContinueButton.IsEnabled = false;
             ContinueButton.IsHitTestVisible = false;
             UpdateEuchreState(_stateDesiredStateAfterHumanClick);
-        }        private static Action EmptyDelegate = delegate () { };
+        }
+        
+        private static Action EmptyDelegate = delegate () { };
         
         private static async Task DelayAsync(int milliseconds)
         {
