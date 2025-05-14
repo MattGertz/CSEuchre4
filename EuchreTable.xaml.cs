@@ -669,7 +669,7 @@ namespace CSEuchre4
             _gameDealerBox[(int)EuchrePlayer.Seats.Partner] = DealerPartner;
             _gameDealerBox[(int)EuchrePlayer.Seats.Player] = DealerPlayer;
         }
-
+        
         private void AnimateACard(System.Drawing.Image imageToAnimate, UIElement startingControl, UIElement endingControl, EuchrePlayer.Seats perspective)
         {
             // Cards always animate from a position to a position, where each position is marked by another control.
@@ -678,85 +678,112 @@ namespace CSEuchre4
             // method simply gets a card image, shows it at the original site, animates motion to the final site, and
             // disposes of the image.
 
-            /*
-             * This works:
-            foo.Visibility = Visibility.Visible;
-            TranslateTransform moveTransform = new TranslateTransform();
-            this.foo.RenderTransform = moveTransform;
-
-            DoubleAnimation anX = new DoubleAnimation(500, 100, TimeSpan.FromMilliseconds(1000));
-            DoubleAnimation anY = new DoubleAnimation(500, 100, TimeSpan.FromMilliseconds(1000));
-
-            anX.Completed += (sd, t) =>
+            // Prepare everything on the UI thread to ensure animations display correctly
+            Dispatcher.Invoke(() => 
             {
-                foo.Visibility = Visibility.Hidden;
-            };
-
-            moveTransform.BeginAnimation(TranslateTransform.XProperty, anX);
-            moveTransform.BeginAnimation(TranslateTransform.YProperty, anY);
-             */
-
-            // Which one to animate -- horizontal or vertical?
-            System.Windows.Controls.Image animatedCard = (perspective == EuchrePlayer.Seats.LeftOpponent || perspective == EuchrePlayer.Seats.RightOpponent) ? AnimatedCardHorizontal : AnimatedCardVertical;
-
-            FrameworkElement animatedCardFrame = (FrameworkElement)animatedCard;
-            FrameworkElement startingControlFrame = (FrameworkElement)startingControl;
-            FrameworkElement endingControlFrame = (FrameworkElement)endingControl;
-
-            // First, invisibly move the animated card to the starting control's margins
-            animatedCardFrame.Margin = new Thickness(startingControlFrame.Margin.Left, startingControlFrame.Margin.Top, startingControlFrame.Margin.Right, startingControlFrame.Margin.Bottom);            // Second, set the image of the animated card
-            SetImage(animatedCard, imageToAnimate);
-            animatedCard.Visibility = Visibility.Visible;
-            // Ensure the other animated card is hidden
-            if (animatedCard == AnimatedCardHorizontal)
-                AnimatedCardVertical.Visibility = Visibility.Hidden;
-            else
-                AnimatedCardHorizontal.Visibility = Visibility.Hidden;
-            UpdateLayout();
-
-            // Third, visibly move the animated card to the ending control's margins
-            TranslateTransform moveTransform = new TranslateTransform();
-            moveTransform.X = endingControlFrame.Margin.Left - startingControlFrame.Margin.Left;
-            moveTransform.Y = endingControlFrame.Margin.Top - startingControlFrame.Margin.Top;
-
-            Duration duration = new Duration(TimeSpan.FromMilliseconds(500));
-            DoubleAnimation animationX = new DoubleAnimation();
-            DoubleAnimation animationY = new DoubleAnimation();
-            animationX.Duration = duration;
-            animationY.Duration = duration;            
-            Storyboard storyboard = new Storyboard();
-            storyboard.Duration = duration;
-            storyboard.Children.Add(animationX);
-            storyboard.Children.Add(animationY);
-            Storyboard.SetTarget(animationX, moveTransform);
-            Storyboard.SetTarget(animationY, moveTransform);            
-            Storyboard.SetTargetProperty(animationX, new PropertyPath("X"));
-            Storyboard.SetTargetProperty(animationY, new PropertyPath("Y"));
-            animationX.To = moveTransform.X;
-            animationY.To = moveTransform.Y;
-            
-            // Generate a unique resource key for each storyboard
-            string storyboardKey = "storyboard_" + Guid.NewGuid().ToString();
-            EuchreGrid.Resources.Add(storyboardKey, storyboard);
-
-            // Use Completed event instead of Thread.Sleep
-            storyboard.Completed += (s, e) => 
-            {
-                // Fourth, free the image of the animated card
-                animatedCard.Visibility = Visibility.Hidden;
-                animatedCard.Source = null;
-
-                // Fifth, invisibly move the animated card back to 0,0 margin
-                animatedCardFrame.Margin = new Thickness(0, 0, 0, 0);
-                
-                // Clean up
-                if (EuchreGrid.Resources.Contains(storyboardKey))
+                try
                 {
-                    EuchreGrid.Resources.Remove(storyboardKey);
-                }
-            };
+                    // Which one to animate -- horizontal or vertical?
+                    System.Windows.Controls.Image animatedCard = (perspective == EuchrePlayer.Seats.LeftOpponent || perspective == EuchrePlayer.Seats.RightOpponent) 
+                        ? AnimatedCardHorizontal 
+                        : AnimatedCardVertical;
 
-            storyboard.Begin();
+                    FrameworkElement animatedCardFrame = (FrameworkElement)animatedCard;
+                    FrameworkElement startingControlFrame = (FrameworkElement)startingControl;
+                    FrameworkElement endingControlFrame = (FrameworkElement)endingControl;
+                    
+                    // Make sure existing animations are cleaned up
+                    animatedCard.BeginAnimation(UIElement.OpacityProperty, null);
+                    
+                    // Bring animated cards to the front
+                    Grid.SetZIndex(AnimatedCardHorizontal, 1000);
+                    Grid.SetZIndex(AnimatedCardVertical, 1000);
+                    
+                    // First, invisibly move the animated card to the starting control's margins
+                    animatedCardFrame.Margin = new Thickness(
+                        startingControlFrame.Margin.Left, 
+                        startingControlFrame.Margin.Top, 
+                        startingControlFrame.Margin.Right, 
+                        startingControlFrame.Margin.Bottom);
+                    
+                    // Size the animated card appropriately
+                    animatedCardFrame.Width = endingControlFrame.Width;
+                    animatedCardFrame.Height = endingControlFrame.Height;
+                    
+                    // Second, set the image of the animated card
+                    SetImage(animatedCard, imageToAnimate);
+                    
+                    // Hide the other animated card and show this one
+                    if (animatedCard == AnimatedCardHorizontal)
+                        AnimatedCardVertical.Visibility = Visibility.Hidden;
+                    else
+                        AnimatedCardHorizontal.Visibility = Visibility.Hidden;
+                    
+                    animatedCard.Visibility = Visibility.Visible;
+                    animatedCard.Opacity = 1.0;
+                    
+                    // Force layout update before starting animation
+                    EuchreGrid.UpdateLayout();
+                    
+                    // Create a transform for the animation
+                    TranslateTransform moveTransform = new TranslateTransform();
+                    animatedCard.RenderTransform = moveTransform;
+                    
+                    // Calculate the translation values
+                    double targetX = endingControlFrame.Margin.Left - startingControlFrame.Margin.Left;
+                    double targetY = endingControlFrame.Margin.Top - startingControlFrame.Margin.Top;
+
+                    // Create a longer duration for better visibility
+                    Duration duration = new Duration(TimeSpan.FromMilliseconds(950));
+                    
+                    // Create animations with explicit From and To values
+                    DoubleAnimation animationX = new DoubleAnimation(0, targetX, duration);
+                    DoubleAnimation animationY = new DoubleAnimation(0, targetY, duration);
+                    
+                    // Add easing for smoother animation
+                    QuadraticEase easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+                    animationX.EasingFunction = easing;
+                    animationY.EasingFunction = easing;
+                    
+                    // Create the storyboard
+                    Storyboard storyboard = new Storyboard();
+                    storyboard.Children.Add(animationX);
+                    storyboard.Children.Add(animationY);
+                    
+                    // Set the targets
+                    Storyboard.SetTarget(animationX, animatedCard);
+                    Storyboard.SetTarget(animationY, animatedCard);
+                    
+                    Storyboard.SetTargetProperty(animationX, new PropertyPath("(UIElement.RenderTransform).(TranslateTransform.X)"));
+                    Storyboard.SetTargetProperty(animationY, new PropertyPath("(UIElement.RenderTransform).(TranslateTransform.Y)"));
+                    
+                    // Generate a unique resource key
+                    string storyboardKey = "storyboard_" + Guid.NewGuid().ToString();
+                    EuchreGrid.Resources.Add(storyboardKey, storyboard);
+                    
+                    // Handle completion
+                    storyboard.Completed += (s, e) => 
+                    {
+                        // Clean up when animation completes
+                        animatedCard.Visibility = Visibility.Hidden;
+                        animatedCard.Source = null;
+                        animatedCardFrame.Margin = new Thickness(0, 0, 0, 0);
+                        
+                        // Remove the storyboard from resources
+                        if (EuchreGrid.Resources.Contains(storyboardKey))
+                        {
+                            EuchreGrid.Resources.Remove(storyboardKey);
+                        }
+                    };
+                    
+                    // Begin the animation
+                    storyboard.Begin();
+                }
+                catch (Exception ex)
+                {
+                    // Gracefully handle any animation errors
+                    System.Diagnostics.Debug.WriteLine("Animation error: " + ex.Message);                }
+            });
         }
 
         private void SpeakWeGotEuchredMyFault(EuchrePlayer.Seats seat)
@@ -1257,8 +1284,9 @@ namespace CSEuchre4
                     KittyCard4,
                     handKitty[3].GetImage(EuchrePlayer.Seats.NoPlayer)
                     );
-            }
-        }          private void DealACard(EuchrePlayer.Seats player, int slot)
+            }        }
+        
+        private void DealACard(EuchrePlayer.Seats player, int slot)
         {
             // Get the next card from the deck
             EuchreCard card = _gameDeck.GetNextCard();
@@ -1268,27 +1296,36 @@ namespace CSEuchre4
             card.Perspective = player;
             
             // Set card state based on player
+            System.Drawing.Image cardImage;
             if (player != EuchrePlayer.Seats.Player)
             {
                 card.stateCurrent = EuchreCard.States.FaceDown;
-                SetImage(gameTableTopCards[(int)player, slot], EuchreCard.imagesCardBack[(int)player]);
+                cardImage = EuchreCard.imagesCardBack[(int)player];
             }
             else
             {
                 card.stateCurrent = EuchreCard.States.FaceUp;
                 // Ensure the image orientation matches the perspective before display
-                SetImage(gameTableTopCards[(int)player, slot], card.imageCurrent);
-            }
+                cardImage = card.imageCurrent;
+            }            // Hide the destination card during animation
+            SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Hidden);
             
-            // Make card visible and set tooltip
-            SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
+            // Animate the card from the center of the table to its position
+            // Using the continue button (center of table) as starting point (approximating the deck position)
+            AnimateACard(cardImage, ContinueButton, gameTableTopCards[(int)player, slot], player);
+            
+            // Add a small delay to ensure animation has time to start
+            System.Threading.Thread.Sleep(100);
+            
+            // Set the image and make card visible
+            SetImage(gameTableTopCards[(int)player, slot], cardImage);
             SetTooltip(gameTableTopCards[(int)player, slot], Properties.Resources.CARDNAME_BACK);
+            SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
             
             // Update the layout to ensure UI is ready
             gameTableTopCards[(int)player, slot].UpdateLayout();
             
-            // Play sound and allow time for UI to refresh 
-            // Keeping this synchronous to ensure proper display order
+            // Play sound
             PlayCardSound();
             RefreshAndSleep(gameTableTopCards[(int)player, slot]);
         }
@@ -1338,17 +1375,54 @@ namespace CSEuchre4
                     k = k + 1;
                     m = 2;
                 }
-            }
-
-            // TODO:  AnimateACard needs to work for the kitty as well
-            // TODO:  What about flipping the cards?
+            }            // Handle the kitty cards with animations
             for (int j = 0; j <= 3; j++)
             {
                 handKitty[j] = _gameDeck.GetNextCard();
+                
+                // Set the state of the kitty card - first one is face up, others face down
                 if (j == 0)
                     handKitty[j].stateCurrent = EuchreCard.States.FaceUp;
                 else if (handKitty[j] != null)
                     handKitty[j].stateCurrent = EuchreCard.States.FaceDown;
+                
+                // Only show j=0 card unless 9 of hearts rule is not used
+                if (j == 0 || !ruleUseNineOfHearts)
+                {
+                    System.Drawing.Image kittyCardImage = (j == 0) ? 
+                        handKitty[j].imageCurrent : 
+                        handKitty[j].GetImage(EuchrePlayer.Seats.NoPlayer);
+                    
+                    // Use AnimateACard to animate the kitty cards into position
+                    // Use one of the player cards as a starting point (approximating the deck position)
+                    // and the appropriate kitty position as the ending point
+                    // We'll use KittyCard1, KittyCard2, etc. as the destination elements
+                    Image destElement = null;
+                    switch (j)
+                    {
+                        case 0: destElement = KittyCard1; break;
+                        case 1: destElement = KittyCard2; break;
+                        case 2: destElement = KittyCard3; break;
+                        case 3: destElement = KittyCard4; break;
+                    }
+                    
+                    // Only animate cards that are going to be visible
+                    if (destElement != null)
+                    {                        // Use continue button (center of table) as starting point for kitty cards
+                        AnimateACard(kittyCardImage, ContinueButton, destElement, EuchrePlayer.Seats.NoPlayer);
+                        
+                        // Set the image and make it visible at the destination
+                        SetImage(destElement, kittyCardImage);
+                        if (j == 0 || !ruleUseNineOfHearts)
+                        {
+                            SetUIElementVisibility(destElement, Visibility.Visible);
+                        }
+                        
+                        // Play a card sound for the kitty card
+                        PlayCardSound();
+                        RefreshAndSleep(destElement);
+                    }
+                }
             }
 
             // Sort the players' cards according to the possible trump
@@ -1369,62 +1443,117 @@ namespace CSEuchre4
         {
             _gameTheirTricks = gamePlayers[(int)EuchrePlayer.Seats.LeftOpponent].handTricksWon + gamePlayers[(int)EuchrePlayer.Seats.RightOpponent].handTricksWon;
             _gameYourTricks = gamePlayers[(int)EuchrePlayer.Seats.Player].handTricksWon + gamePlayers[(int)EuchrePlayer.Seats.Partner].handTricksWon;
-            UpdateTricksText();
-        }
-
+            UpdateTricksText();        }
+        
         private void PlaySelectedCard(EuchrePlayer player, int index)
         {
-            // TODO:  AnimateACard call goes here.
-
             if (index > 4) throw new System.Exception("Invalid index");
 
             player.handCardsHeld[index].stateCurrent = EuchreCard.States.FaceUp;
             System.Drawing.Image faceImage = player.handCardsHeld[index].GetImage(player.Seat);
-            SetImage(gameTableTopCards[(int)player.Seat, 5], faceImage);
-
+            
+            // Get card information for status and tooltips
             string s = Properties.Resources.ResourceManager.GetString(player.handCardsHeld[index].GetDisplayStringResourceName(handTrumpSuit));
             if (string.IsNullOrEmpty(s)) throw new System.Exception("Invalid value");
 
+            // Set up the tooltip for the destination card position
             SetTooltip(gameTableTopCards[(int)player.Seat, 5], s);
 
+            // Update status text
             StringBuilder sPlayed = new StringBuilder();
             sPlayed.AppendFormat(Properties.Resources.Notice_PlayedACard, player.GetDisplayName(), s);
             UpdateStatus(sPlayed.ToString());
 
+            // Save card into played cards collections
             handPlayedCards[(int)player.Seat] = player.handCardsHeld[index];
-
             MarkCardAsPlayed(player.handCardsHeld[index]);
+            
+            // Animate the card from its current position to the played card position
+            AnimateACard(faceImage, gameTableTopCards[(int)player.Seat, index], gameTableTopCards[(int)player.Seat, 5], player.Seat);
+
+            // Clean up the original card
             player.handCardsHeld[index] = null;
             SetTooltip(gameTableTopCards[(int)player.Seat, index], null);
-            gameTableTopCards[(int)player.Seat, index].Source = null;            
-            SetUIElementVisibility(gameTableTopCards[(int)player.Seat, index], Visibility.Hidden);            
+            gameTableTopCards[(int)player.Seat, index].Source = null;
+            SetUIElementVisibility(gameTableTopCards[(int)player.Seat, index], Visibility.Hidden);
+              // Hide destination until animation completes
+            SetUIElementVisibility(gameTableTopCards[(int)player.Seat, 5], Visibility.Hidden);
+            
+            // Set the image for when animation completes
+            SetImage(gameTableTopCards[(int)player.Seat, 5], faceImage);
+            
+            // Add a small delay to ensure animation has time to complete
+            System.Threading.Thread.Sleep(200);
+            
+            // Now make the card visible at its final position
             SetUIElementVisibility(gameTableTopCards[(int)player.Seat, 5], Visibility.Visible);
-              // First ensure the animation is visible by updating the layout
-            UpdateLayout();
             
-            // Use the simpler card sound method with pacing
-            PlayCardSound();
-            
-            // Make sure the UI is properly refreshed after the sound/sleep
-            RefreshAndSleep(gameTableTopCards[(int)player.Seat, 5]);
-        }
-
+            // Play the card sound
+            PlayCardSound();        }
+        
         private void SwapCardWithKitty(EuchrePlayer player, int index)
         {
-            EuchreCard card = handKitty[0];
-            handKitty[0] = player.handCardsHeld[index];
-            player.handCardsHeld[index] = card;
+            EuchreCard kittyCard = handKitty[0];
+            EuchreCard playerCard = player.handCardsHeld[index];
+            
+            // Prepare the images before the swap
+            System.Drawing.Image kittyCardImage = kittyCard.imageCurrent; // Kitty card is always face up at this point
+            
+            // Save the state of the player's card before swap
+            System.Drawing.Image playerCardImage;
+            if (player.Seat == EuchrePlayer.Seats.Player)
+                playerCardImage = playerCard.imageCurrent;
+            else
+                playerCardImage = EuchreCard.imagesCardBack[(int)player.Seat];
+            
+            // Perform the swap in data model
+            handKitty[0] = playerCard;
+            player.handCardsHeld[index] = kittyCard;
+            
+            // Set the states for the cards in their new locations
             handKitty[0].stateCurrent = EuchreCard.States.FaceDown;
             handKitty[0].Perspective = EuchrePlayer.Seats.Player;
             player.handCardsHeld[index].Perspective = EuchrePlayer.Seats.Player;
-
+            
             if (player.Seat == EuchrePlayer.Seats.Player)
                 player.handCardsHeld[index].stateCurrent = EuchreCard.States.FaceUp;
             else
                 player.handCardsHeld[index].stateCurrent = EuchreCard.States.FaceDown;
-
+            
             // Only this player knows that this card is buried -- don't add it to the "cards played" list
             player.trickBuriedCard = handKitty[0];
+              // Temporarily hide the destination cards during animation
+            gameTableTopCards[(int)player.Seat, index].Visibility = Visibility.Hidden;
+            KittyCard1.Visibility = Visibility.Hidden;
+            
+            // Animate the kitty card moving to the player's hand
+            AnimateACard(kittyCardImage, KittyCard1, gameTableTopCards[(int)player.Seat, index], player.Seat);
+            
+            // Also animate the player's card moving to the kitty position (face down)
+            // First create the face-down image for the kitty
+            System.Drawing.Image playerCardFaceDown = handKitty[0].GetImage(EuchrePlayer.Seats.NoPlayer);
+            // Animate from player's position to kitty
+            AnimateACard(playerCardFaceDown, gameTableTopCards[(int)player.Seat, index], KittyCard1, EuchrePlayer.Seats.NoPlayer);
+            
+            // Add a small delay to ensure animations have time to start
+            System.Threading.Thread.Sleep(500);
+            
+            // Update the visuals - set the new image at the player's position
+            SetImage(gameTableTopCards[(int)player.Seat, index], 
+                (player.Seat == EuchrePlayer.Seats.Player) ? kittyCard.imageCurrent : EuchreCard.imagesCardBack[(int)player.Seat]);
+            
+            // Set the new image at the kitty position (face down)
+            SetImage(KittyCard1, handKitty[0].GetImage(EuchrePlayer.Seats.NoPlayer));
+            
+            // Make the destination cards visible again
+            gameTableTopCards[(int)player.Seat, index].Visibility = Visibility.Visible;
+            KittyCard1.Visibility = Visibility.Visible;
+            
+            // Play sound for the card movement
+            PlayCardSound();
+            
+            // Let the animation complete before continuing
+            RefreshAndSleep(KittyCard1);
         }
 
         private void PrepTrick()
@@ -1793,26 +1922,28 @@ namespace CSEuchre4
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Hidden;
             handDealer = EuchrePlayer.NextPlayer(handDealer);
             _gameDealerBox[(int)handDealer].Visibility = Visibility.Visible;        }
-        
-        private EuchreCard DealACardForDeal(EuchrePlayer.Seats player, int slot)
+          private EuchreCard DealACardForDeal(EuchrePlayer.Seats player, int slot)
         {
             EuchreCard card = _gameDeck.GetNextCard();
             
             // All cards should be face up during dealer selection
             System.Drawing.Image cardImage = card.imageCurrent;
-                  // Animate the card from the continue button to its position
-            // AnimateACard call commented out to prevent animation controls from becoming visible
-            // AnimateACard(EuchreCard.imagesCardBack[(int)player], ContinueButton, gameTableTopCards[(int)player, slot], player);
-            
-            // Make the card visible at its destination
-            SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
-            
-            // Now update the perspective after the animation
+                    // Set the card's perspective first
             card.Perspective = player;
             
-            // Set the card image and make it visible
+            // Hide destination card before animation
+            SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Hidden);
+            
+            // Animate the card from the continue button to its position
+            AnimateACard(cardImage, ContinueButton, gameTableTopCards[(int)player, slot], player);
+            
+            // Add a small delay to ensure animation has time to start
+            System.Threading.Thread.Sleep(100);
+            
+            // Make the card visible at its destination and set the image
             SetImage(gameTableTopCards[(int)player, slot], cardImage);
             SetTooltip(gameTableTopCards[(int)player, slot], Properties.Resources.ResourceManager.GetString(card.GetDisplayStringResourceName()));
+            SetUIElementVisibility(gameTableTopCards[(int)player, slot], Visibility.Visible);
             
             // Update display and play sound
             StringBuilder sDealt = new StringBuilder();
@@ -1970,14 +2101,76 @@ namespace CSEuchre4
             _gameDeck = new EuchreCardDeck(ruleUseNineOfHearts, this);
             _gameDeck.Initialize();
 
-            return true;
-        }
-
+            return true;        }
+        
         private bool QueryCancelClose()
         {
             if (_stateGameStarted)
             {
-                if (MessageBox.Show(Properties.Resources.Command_Exit, Properties.Resources.Command_ExitTitle, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                // Create a custom MessageBox equivalent that will be owner-centered
+                MessageBoxResult result = MessageBoxResult.Cancel;
+                
+                // Run on UI thread to ensure proper window placement
+                Dispatcher.Invoke(() => {
+                    // Create a confirmation window with owner = this (the game window)
+                    Window confirmDialog = new Window
+                    {
+                        Title = Properties.Resources.Command_ExitTitle,
+                        SizeToContent = SizeToContent.WidthAndHeight,
+                        WindowStyle = WindowStyle.ToolWindow,
+                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                        Owner = this,
+                        ResizeMode = ResizeMode.NoResize
+                    };
+
+                    // Create the message and buttons
+                    StackPanel panel = new StackPanel { Margin = new Thickness(15) };
+                    panel.Children.Add(new TextBlock {
+                        Text = Properties.Resources.Command_Exit,
+                        Margin = new Thickness(0, 0, 0, 15),
+                        TextWrapping = TextWrapping.Wrap
+                    });
+
+                    // Button panel
+                    StackPanel buttonPanel = new StackPanel {
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right
+                    };
+
+                    Button okButton = new Button {
+                        Content = "OK",
+                        Width = 75,
+                        Height = 23,
+                        Margin = new Thickness(0, 0, 10, 0),
+                        IsDefault = true
+                    };
+                    okButton.Click += (s, e) => {
+                        result = MessageBoxResult.OK;
+                        confirmDialog.Close();
+                    };
+
+                    Button cancelButton = new Button {
+                        Content = "Cancel",
+                        Width = 75,
+                        Height = 23,
+                        IsCancel = true
+                    };
+                    cancelButton.Click += (s, e) => {
+                        result = MessageBoxResult.Cancel;
+                        confirmDialog.Close();
+                    };
+
+                    buttonPanel.Children.Add(okButton);
+                    buttonPanel.Children.Add(cancelButton);
+                    panel.Children.Add(buttonPanel);
+
+                    confirmDialog.Content = panel;
+
+                    // Show as dialog (modal)
+                    confirmDialog.ShowDialog();
+                });
+                
+                if (result != MessageBoxResult.OK)
                 {
                     return true;
                 }
@@ -2323,7 +2516,7 @@ namespace CSEuchre4
         private EuchrePlayer.Seats _handPotentialDealer;
         private int potentialDealerCardIndex;
 
-        private const int _timerSleepDuration = 250;
+        private const int _timerSleepDuration = 350;
         private System.Windows.Input.Cursor _cursorCached;
 
         #endregion
